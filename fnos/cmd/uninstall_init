@@ -1,0 +1,7 @@
+#!/bin/bash
+# 卸载前：停服务
+# 优先用已安装目录里的 main；安装流程里 $0 可能指向临时解包目录
+CMD_DIR="/var/apps/movecarlite/cmd"
+[ -x "${CMD_DIR}/main" ] || CMD_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+bash "${CMD_DIR}/main" stop
+exit 0

@@ -1,0 +1,25 @@
+#!/bin/bash
+# 配置保存后：写入新密码并重启服务，使端口/密码立即生效
+set -u
+
+# 优先用已安装目录里的 main；安装流程里 $0 可能指向临时解包目录
+CMD_DIR="/var/apps/movecarlite/cmd"
+[ -x "${CMD_DIR}/main" ] || CMD_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+
+PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/movecarlite}"
+PASS_FILE="${PKGVAR}/admin.password"
+
+mkdir -p "${PKGVAR}/data" || exit 1
+
+if [ -n "${admin_password:-}" ]; then
+    printf '%s\n' "${admin_password}" > "${PASS_FILE}"
+    chmod 600 "${PASS_FILE}" 2>/dev/null
+    if [ "$(id -u)" = "0" ] && [ -n "${TRIM_UID:-}" ]; then
+        chown "${TRIM_UID}:${TRIM_GID:-$TRIM_UID}" "${PASS_FILE}" 2>/dev/null
+    fi
+fi
+
+echo "port=${ui_port:-18100}" > "${PKGVAR}/install.info" 2>/dev/null
+
+bash "${CMD_DIR}/main" restart
+exit 0

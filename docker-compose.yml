@@ -1,0 +1,19 @@
+services:
+  movecar:
+    build: .
+    image: movecar-lite:1.0.0
+    container_name: movecar_lite
+    restart: always
+    ports:
+      - "13100:8000"
+    environment:
+      # 密码来自同目录 .env（部署脚本自动写入，权限 600），不要写死在仓库里
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?请在 .env 中设置 ADMIN_PASSWORD}
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

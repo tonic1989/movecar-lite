@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>挪车海报</title>
+<link rel="stylesheet" href="static/app.css?v=4">
+<style>
+  body{background:#eceef2}
+  .stripe{position:sticky;top:0;z-index:5;background:rgba(236,238,242,.92);backdrop-filter:blur(8px);padding:12px 0 6px;text-align:center}
+  .dots{display:flex;gap:7px;justify-content:center;margin-top:8px}
+  .dots i{width:7px;height:7px;border-radius:50%;background:#c3c8d0;display:block}
+  .dots i.on{background:#15181d;width:20px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="boot" class="card center"><p class="muted">正在生成海报…</p></div>
+
+  <div id="app" class="hide">
+    <div class="stripe">
+      <div class="row between wrap" style="padding:0 0 8px;max-width:none">
+        <div>
+          <h2 style="margin:0" id="plate">—</h2>
+          <div class="muted tiny">左右滑动挑一个样式，长按图片保存</div>
+        </div>
+        <button class="sm" id="save">保存图片</button>
+      </div>
+      <div class="dots" id="dots"></div>
+    </div>
+
+    <div class="poster-strip" id="strip"></div>
+    <p class="muted tiny center">打印建议：A5 尺寸（148×210mm）贴于挡风玻璃内侧<br>二维码长期有效，改车牌后重新保存即可</p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const CODE = (new URLSearchParams(location.search).get('u') || '').trim();
+const W = 1080, H = 1440;
+let qr = null, owner = null, canvases = [], current = 0;
+
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+async function api(p){ const r=await fetch(p); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+
+// ---- 画布基础工具
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function fitText(ctx, text, maxW, startSize, family, weight='800'){
+  let size = startSize;
+  do { ctx.font = `${weight} ${size}px ${family}`; if(ctx.measureText(text).width <= maxW) break; size -= 4; } while(size > 40);
+  return size;
+}
+function drawQR(ctx, x, y, size, dark, light){
+  // 白底卡片 + 二维码，含 2 模块静区
+  const n = qr.size, pad = Math.round(size*0.07), inner = size - pad*2;
+  const cell = inner / (n + 4), qz = cell*2;
+  ctx.fillStyle = light || '#fff';
+  rr(ctx, x, y, size, size, Math.round(size*0.06)); ctx.fill();
+  ctx.fillStyle = dark || '#111';
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    if(!qr.modules[r][c]) continue;
+    const px = x + pad + qz + c*cell, py = y + pad + qz + r*cell;
+    ctx.fillRect(Math.round(px), Math.round(py), Math.ceil(cell), Math.ceil(cell));
+  }
+}
+function wrap(ctx, text, x, y, maxW, lh){
+  const chars = [...text]; let line = '', yy = y;
+  for(const ch of chars){
+    if(ctx.measureText(line+ch).width > maxW && line){ ctx.fillText(line, x, yy); line = ch; yy += lh; }
+    else line += ch;
+  }
+  if(line) ctx.fillText(line, x, yy);
+  return yy;
+}
+const PLATE = () => (owner.plate || owner.name || owner.code || '车主');
+const NOTE = () => (owner.note || '').slice(0, 26);
+
+// ---- 模板 1：暗夜金
+function tplDark(ctx){
+  const g = ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0d0f13'); g.addColorStop(.55,'#191d25'); g.addColorStop(1,'#0a0c10');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // 光晕
+  const rg = ctx.createRadialGradient(W*0.78,140,20,W*0.78,140,520);
+  rg.addColorStop(0,'rgba(212,175,105,.30)'); rg.addColorStop(1,'rgba(212,175,105,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0,0,W,760);
+
+  ctx.fillStyle = '#d4af69'; ctx.font = '600 34px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign='center'; ctx.fillText('T E M P O R A R Y   P A R K I N G', W/2, 118);
+
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.font = '700 46px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('临时停车 · 请多包涵', W/2, 200);
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.font = '400 30px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('如需挪车，请扫码通知我', W/2, 252);
+
+  // 车牌
+  const p = PLATE();
+  const size = fitText(ctx, p, W-220, 132, '"PingFang SC","Microsoft YaHei",sans-serif');
+  ctx.font = `800 ${size}px "PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.fillStyle = '#fff'; ctx.fillText(p, W/2, 400);
+  ctx.strokeStyle = 'rgba(212,175,105,.55)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W/2-160,438); ctx.lineTo(W/2+160,438); ctx.stroke();
+
+  if(NOTE()){
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '400 30px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.fillText(NOTE(), W/2, 496);
+  }
+
+  // 二维码
+  const qs = 520, qx = (W-qs)/2, qy = 570;
+  ctx.save(); ctx.shadowColor='rgba(212,175,105,.45)'; ctx.shadowBlur=60;
+  drawQR(ctx, qx, qy, qs, '#0d0f13', '#ffffff'); ctx.restore();
+
+  ctx.fillStyle = '#d4af69'; ctx.font = '700 40px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('扫 码 通 知 车 主 挪 车', W/2, qy+qs+92);
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '400 26px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('无需拨打电话 · 全程保护双方隐私', W/2, qy+qs+140);
+
+  ctx.fillStyle='rgba(255,255,255,.22)'; ctx.font='400 24px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('MoveCar Lite', W/2, H-56);
+}
+
+// ---- 模板 2：薄荷清晨
+function tplMint(ctx){
+  const g = ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#e8f6ee'); g.addColorStop(.5,'#f6fbf7'); g.addColorStop(1,'#e2f1e8');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = 'rgba(18,146,79,.06)';
+  ctx.beginPath(); ctx.arc(120,180,220,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(W-60,H-220,260,0,7); ctx.fill();
+
+  // 白色圆角卡
+  ctx.save(); ctx.shadowColor='rgba(18,80,50,.12)'; ctx.shadowBlur=50; ctx.shadowOffsetY=18;
+  ctx.fillStyle='#fff'; rr(ctx,70,90,W-140,H-210,52); ctx.fill(); ctx.restore();
+
+  ctx.textAlign='center';
+  ctx.fillStyle='#12924f'; ctx.font='600 30px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('T E M P O R A R Y   P A R K I N G', W/2, 190);
+
+  ctx.fillStyle='#12281c'; ctx.font='700 46px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('不好意思，占用了车位', W/2, 268);
+  ctx.fillStyle='#6b8a78'; ctx.font='400 30px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('需要挪车请扫下方二维码', W/2, 318);
+
+  const p = PLATE();
+  const size = fitText(ctx, p, W-320, 120, '"PingFang SC","Microsoft YaHei",sans-serif');
+  ctx.font = `800 ${size}px "PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.fillStyle='#12281c'; ctx.fillText(p, W/2, 462);
+  ctx.strokeStyle='#d6e7dc'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(W/2-140,500); ctx.lineTo(W/2+140,500); ctx.stroke();
+
+  if(NOTE()){
+    ctx.fillStyle='#7d9a89'; ctx.font='400 28px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.fillText(NOTE(), W/2, 552);
+  }
+
+  const qs=500, qx=(W-qs)/2, qy=600;
+  ctx.strokeStyle='#e4efe8'; ctx.lineWidth=2; rr(ctx,qx-14,qy-14,qs+28,qs+28,30); ctx.stroke();
+  drawQR(ctx, qx, qy, qs, '#12281c', '#ffffff');
+
+  ctx.fillStyle='#12924f'; ctx.font='700 40px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('扫码 / 一键通知我挪车', W/2, qy+qs+92);
+  ctx.fillStyle='#8aa896'; ctx.font='400 26px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('我会尽快下来，谢谢您的理解', W/2, qy+qs+138);
+}
+
+// ---- 模板 3：警示黑黄
+function tplHazard(ctx){
+  ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H);
+  // 顶部/底部黄条 + 斜纹
+  ctx.fillStyle='#ffd400';
+  ctx.fillRect(0,0,W,120); ctx.fillRect(0,H-96,W,96);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0,0,W,120); ctx.clip();
+  ctx.fillStyle='#111';
+  for(let i=-140;i<W+140;i+=84){ ctx.save(); ctx.translate(i,0); ctx.rotate(-0.42); ctx.fillRect(0,-80,34,300); ctx.restore(); }
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0,H-96,W,96); ctx.clip();
+  ctx.fillStyle='#111';
+  for(let i=-140;i<W+140;i+=84){ ctx.save(); ctx.translate(i,0); ctx.rotate(0.42); ctx.fillRect(0,H-140,34,300); ctx.restore(); }
+  ctx.restore();
+
+  ctx.textAlign='center';
+  ctx.fillStyle='#ffd400'; ctx.font='800 40px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('！ 请 注 意  ！', W/2, 192);
+
+  ctx.fillStyle='#fff'; ctx.font='700 56px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('我的车挡住您了', W/2, 280);
+  ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='400 30px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('扫一扫，我立刻下来挪车', W/2, 330);
+
+  // 车牌框
+  const p = PLATE();
+  const size = fitText(ctx, p, W-300, 118, '"PingFang SC","Microsoft YaHei",sans-serif');
+  ctx.fillStyle='#ffd400'; rr(ctx, W/2-(Math.min(W-260, ctx.measureText(p).width+140))/2, 380, Math.min(W-260, ctx.measureText(p).width+140), 170, 18); ctx.fill();
+  ctx.fillStyle='#111'; ctx.font=`800 ${size}px "PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.fillText(p, W/2, 500);
+
+  if(NOTE()){
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='400 28px "PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.fillText(NOTE(), W/2, 600);
+  }
+
+  const qs=490, qx=(W-qs)/2, qy=640;
+  ctx.fillStyle='#fff'; rr(ctx,qx-16,qy-16,qs+32,qs+32,26); ctx.fill();
+  drawQR(ctx, qx, qy, qs, '#111', '#fff');
+
+  ctx.fillStyle='#ffd400'; ctx.font='800 42px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('扫码通知挪车', W/2, qy+qs+96);
+  ctx.fillStyle='rgba(255,255,255,.45)'; ctx.font='400 24px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillText('不用打电话 · 30 秒内我会收到提醒', W/2, qy+qs+140);
+}
+
+const TPLS = [
+  {name:'暗夜金', fn:tplDark},
+  {name:'薄荷绿', fn:tplMint},
+  {name:'警示黑黄', fn:tplHazard},
+];
+
+function build(){
+  const strip = $('#strip'); strip.innerHTML = ''; canvases = [];
+  const dpr = 1;
+  TPLS.forEach((t, i) => {
+    const fig = document.createElement('figure');
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    t.fn(ctx);
+    fig.appendChild(cv);
+    strip.appendChild(fig);
+    canvases.push(cv);
+  });
+  const dots = $('#dots');
+  dots.innerHTML = TPLS.map((t,i)=>`<i class="${i===0?'on':''}" title="${t.name}"></i>`).join('');
+  strip.onscroll = () => {
+    const i = Math.round(strip.scrollLeft / (strip.clientWidth + 14));
+    current = Math.max(0, Math.min(TPLS.length-1, i));
+    [...dots.children].forEach((d,k)=>d.classList.toggle('on', k===current));
+  };
+}
+
+function save(){
+  const cv = canvases[current];
+  if(!cv) return;
+  const name = `挪车海报-${PLATE()}.png`.replace(/[\\/:*?"<>|]/g,'_');
+  if(/iPhone|iPad|iPod/.test(navigator.userAgent)){
+    const w = window.open('', '_blank');
+    if(w){ w.document.write(`<title>长按保存</title><meta name="viewport" content="width=device-width"><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center"><img src="${cv.toDataURL('image/png')}" style="width:100%"><p style="position:fixed;bottom:20px;color:#fff;font:14px -apple-system">长按图片 → 存储到照片</p></body>`); w.document.close(); return; }
+  }
+  cv.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    toast('已保存到相册/下载目录');
+  }, 'image/png');
+}
+
+async function init(){
+  if(!CODE){ $('#boot').innerHTML = '<h2>缺少车主标识</h2><p class="muted">请通过 /qr?u=您的标识 访问</p>'; return; }
+  try{
+    const [pub, q] = await Promise.all([
+      api('api/pub/'+encodeURIComponent(CODE)),
+      api('api/qr/'+encodeURIComponent(CODE)+'.json')
+    ]);
+    owner = pub.owner; qr = q;
+    $('#plate').textContent = owner.plate || owner.code;
+    $('#boot').classList.add('hide'); $('#app').classList.remove('hide');
+    // 等字体就绪再画，避免首帧字体回退
+    if(document.fonts && document.fonts.ready) { try{ await document.fonts.ready; }catch(e){} }
+    build();
+    const t = parseInt(new URLSearchParams(location.search).get('t')||'0',10);
+    if(t>0 && t<TPLS.length){
+      const strip = $('#strip');
+      setTimeout(()=>{ strip.scrollLeft = t*(strip.clientWidth+14); }, 60);
+    }
+  }catch(e){
+    $('#boot').innerHTML = '<h2>无法生成</h2><p class="muted">'+e.message+'</p>';
+  }
+}
+$('#save').onclick = save;
+init();
+</script>
+</body>
+</html>

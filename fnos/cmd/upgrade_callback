@@ -1,0 +1,22 @@
+#!/bin/bash
+# 升级后：数据目录本来就是旧的（$TRIM_PKGVAR 保留），只需修正权限并拉起
+set -u
+
+# 优先用已安装目录里的 main；安装流程里 $0 可能指向临时解包目录
+CMD_DIR="/var/apps/movecarlite/cmd"
+[ -x "${CMD_DIR}/main" ] || CMD_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+
+PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/movecarlite}"
+mkdir -p "${PKGVAR}/data"
+
+if [ -n "${admin_password:-}" ]; then
+    printf '%s\n' "${admin_password}" > "${PKGVAR}/admin.password"
+    chmod 600 "${PKGVAR}/admin.password" 2>/dev/null
+fi
+
+if [ "$(id -u)" = "0" ] && [ -n "${TRIM_UID:-}" ]; then
+    chown -R "${TRIM_UID}:${TRIM_GID:-$TRIM_UID}" "${PKGVAR}" 2>/dev/null
+fi
+
+bash "${CMD_DIR}/main" start
+exit 0

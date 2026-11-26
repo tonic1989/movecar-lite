@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>通知车主挪车</title>
+<link rel="stylesheet" href="static/app.css?v=4">
+</head>
+<body>
+<div class="wrap">
+  <div id="boot" class="card center">
+    <p class="muted">正在识别车辆信息…</p>
+  </div>
+
+  <div id="app" class="hide">
+    <div class="hero">
+      <div class="row between" style="margin-bottom:10px">
+        <span class="muted tiny">扫码通知车主挪车</span>
+        <span id="locPill" class="pill warn"><span class="dot"></span><span>定位中</span></span>
+      </div>
+      <div class="big-plate plate" id="plate">—</div>
+      <div class="muted" id="ownerNote" style="margin-top:6px"></div>
+    </div>
+
+    <div id="formArea" class="card">
+      <h3>请选择情况</h3>
+      <div class="chips" id="chips"></div>
+      <label class="field">
+        <span>留言（选填，车主会看到）</span>
+        <input id="note" maxlength="80" placeholder="如：我马上要出车，麻烦挪一下">
+      </label>
+      <button id="sendBtn" class="block big">通知车主挪车</button>
+      <p class="muted tiny center" id="hint" style="margin-top:10px">点击即向车主发送通知</p>
+    </div>
+
+    <div id="doneArea" class="card center hide">
+      <div style="font-size:44px;line-height:1">✅</div>
+      <h2 style="margin-top:8px" id="doneTitle">已通知车主</h2>
+      <p class="muted" id="doneMsg">请稍等片刻，车主收到后一般会尽快处理。</p>
+      <div id="ownerReply" class="reply hide"></div>
+      <div id="ackState" class="pill warn" style="margin-top:6px"><span class="dot"></span><span>等待车主处理</span></div>
+      <a id="callOwner" class="btn block" href="#"
+         style="display:none;margin-top:14px;background:#b45309;color:#fff">📞 紧急电话联系车主</a>
+      <div class="row" style="margin-top:16px">
+        <button class="ghost grow" id="againBtn">再发一条</button>
+      </div>
+    </div>
+
+    <p class="muted tiny center" id="foot"></p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const qs = new URLSearchParams(location.search);
+const CODE = (qs.get('u') || '').trim();
+let owner = null, cooldown = 30, challenge = null, releasedAt = 0, counting = false, chosen = '';
+let history = new Set();
+
+function toast(msg, ms=2600){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function fmtTime(ts){
+  const d = new Date(ts*1000), n = Date.now()/1000, diff = n - ts;
+  const p = x => String(x).padStart(2,'0');
+  if(diff < 60) return '刚刚';
+  if(diff < 3600) return Math.floor(diff/60)+' 分钟前';
+  if(diff < 86400) return Math.floor(diff/3600)+' 小时前';
+  return `${d.getMonth()+1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function setLoc(state, text){
+  const el = $('#locPill'); el.className = 'pill ' + state;
+  el.innerHTML = '<span class="dot"></span><span>'+text+'</span>';
+}
+
+async function api(path, body){
+  const r = await fetch(path, {method: body===undefined?'GET':'POST',
+    headers: body===undefined?{}:{'Content-Type':'application/json'},
+    body: body===undefined?undefined:JSON.stringify(body)});
+  const j = await r.json().catch(()=>({ok:false,error:'HTTP '+r.status}));
+  if(!r.ok || j.ok===false){ const e = new Error(j.error||('HTTP '+r.status)); e.body=j; e.status=r.status; throw e; }
+  return j;
+}
+
+// locErr：记录定位失败的真正原因，用来给用户看明白到底是"没授权"还是"HTTP 根本不给定位"
+let locErr = null, locErrMsg = '';
+
+function locSecure(){
+  if(window.isSecureContext) return true;
+  return ['localhost','127.0.0.1','::1','[::1]'].includes(location.hostname);
+}
+
+function getLoc(){
+  return new Promise(resolve => {
+    // 非 HTTPS 时 Chrome/Safari 直接拒绝定位，报的却是 code=1（看起来像"用户拒绝"）
+    if(!locSecure()){ locErr = 'insecure'; return resolve(null); }
+    if(!navigator.geolocation){ locErr = 'unsupported'; return resolve(null); }
+    const timer = setTimeout(()=>{ locErr = locErr || 'timeout'; resolve(null); }, 9000);
+    navigator.geolocation.getCurrentPosition(
+      p => { clearTimeout(timer); locErr = null; resolve({lat:p.coords.latitude, lng:p.coords.longitude, accuracy:p.coords.accuracy}); },
+      e => {
+        clearTimeout(timer);
+        locErr = e && e.code === 1 ? 'denied' : e && e.code === 2 ? 'unavailable' : e && e.code === 3 ? 'timeout' : 'unknown';
+        locErrMsg = (e && e.message) || '';
+        resolve(null);
+      },
+      {enableHighAccuracy:true, timeout:8000, maximumAge:30000}
+    );
+  });
+}
+
+const LOC_PILL = {insecure:'需 HTTPS', denied:'定位被拒', unavailable:'定位不可用', timeout:'定位超时', unsupported:'不支持定位'};
+function locHint(sec){
+  const n = sec + ' 秒';
+  if(locErr === 'insecure') return '当前用 HTTP 打开，浏览器不允许定位（不是您没授权）。'+n+'后可发送；要自动定位请用 HTTPS 域名打开。';
+  if(locErr === 'denied') return '您拒绝了定位权限，'+n+'后可发送。如需带上位置，请在浏览器设置里允许本站定位。';
+  if(locErr === 'unsupported' || locErr === 'unavailable') return '这台设备拿不到定位，'+n+'后可发送。';
+  if(locErr === 'timeout') return '定位超时（室内信号弱），'+n+'后可发送。';
+  return '未获取到位置，'+n+'后可发送。';
+}
+
+async function init(){
+  if(!CODE){ $('#boot').innerHTML = '<h2>二维码无效</h2><p class="muted">缺少车主标识，请重新扫码。</p>'; return; }
+  let pub;
+  try { pub = await api('api/pub/'+encodeURIComponent(CODE)); }
+  catch(e){ $('#boot').innerHTML = '<h2>无法使用</h2><p class="muted">'+e.message+'</p>'; return; }
+
+  owner = pub.owner; cooldown = pub.cooldown||30;
+  $('#boot').classList.add('hide'); $('#app').classList.remove('hide');
+  $('#plate').textContent = owner.plate || owner.code;
+  if(owner.note) $('#ownerNote').textContent = owner.note;
+  $('#foot').textContent = '隐私说明：本页仅把您的位置与留言发送给该车主，不对外公开。';
+
+  const chips = $('#chips');
+  (pub.reasons||[]).forEach((r,i)=>{
+    const d = document.createElement('div');
+    d.className = 'chip' + (i===0?' on':''); d.textContent = r;
+    if(i===0) chosen = r;
+    d.onclick = ()=>{ [...chips.children].forEach(c=>c.classList.remove('on')); d.classList.add('on'); chosen = r; };
+    chips.appendChild(d);
+  });
+
+  setLoc('warn','定位中');
+  const loc = await getLoc();
+  let c;
+  try { c = await api('api/challenge', {code:CODE, loc_ok: !!loc}); }
+  catch(e){ toast(e.message); return; }
+
+  if(loc){ setLoc('ok','已获取定位'); }
+  else { setLoc('warn', LOC_PILL[locErr] || '未授权定位'); }
+
+  challenge = c.challenge;
+  if(!loc && c.cooldown > 0){
+    releasedAt = Date.now() + c.cooldown*1000;
+    $('#hint').textContent = locHint(c.cooldown);
+    countdown();
+  }
+  window._loc = loc;
+
+  // SSE：等车主点击已处理
+  es = new EventSource('api/stream/'+encodeURIComponent(CODE));
+  es.addEventListener('ack', () => {
+    const el = $('#ackState'); if(!el || el.closest('.hide')) return;
+    el.className = 'pill ok'; el.innerHTML = '<span class="dot"></span><span>车主已确认</span>';
+    $('#doneTitle').textContent = '车主已收到';
+    $('#doneMsg').classList.add('hide');
+    const rp = $('#ownerReply');
+    rp.innerHTML = '<span class="k">车主回复</span><span class="t">抱歉，马上处理！</span>';
+    rp.classList.remove('hide');
+    rp.classList.remove('pop'); void rp.offsetWidth; rp.classList.add('pop');
+  });
+}
+let es = null;
+
+function countdown(){
+  counting = true;
+  const btn = $('#sendBtn');
+  const tick = ()=>{
+    const left = Math.ceil((releasedAt - Date.now())/1000);
+    if(left > 0){
+      btn.disabled = true;
+      btn.textContent = '请等待 ' + left + ' 秒';
+      setTimeout(tick, 250);
+    } else {
+      counting = false; btn.disabled = false;
+      btn.textContent = '通知车主挪车';
+      $('#hint').textContent = '现在可以发送了';
+    }
+  };
+  tick();
+}
+
+$('#sendBtn').onclick = async () => {
+  if(counting) return;
+  const btn = $('#sendBtn'); btn.disabled = true; btn.textContent = '发送中…';
+  try{
+    const r = await api('api/call', {code:CODE, challenge, reason:chosen, note:$('#note').value.trim(), loc:window._loc});
+    $('#formArea').classList.add('hide');
+    $('#doneArea').classList.remove('hide');
+    if(!r.pushed){ $('#doneMsg').textContent = '通知通道暂时不可用，建议改用电话联系车主。'; $('#ackState').className='pill err'; $('#ackState').innerHTML='<span class="dot"></span><span>发送失败</span>'; }
+    if(r.phone){
+      const a = $('#callOwner');
+      a.href = 'tel:' + r.phone;
+      a.style.display = 'flex';
+    }
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    btn.disabled = false; btn.textContent = '通知车主挪车';
+    if(e.body && e.body.retry_after){ releasedAt = Date.now() + e.body.retry_after*1000; countdown(); }
+    toast(e.message);
+  }
+};
+
+$('#againBtn').onclick = () => {
+  // 重新领凭证（此时已有定位结果，通常无需罚站）
+  api('api/challenge', {code:CODE, loc_ok: !!window._loc}).then(c=>{
+    challenge = c.challenge;
+    if(!window._loc && c.cooldown>0){ releasedAt = Date.now()+c.cooldown*1000; countdown(); }
+    // 复位上一轮的状态（车主回复气泡、状态胶囊、电话提示）
+    const rp = $('#ownerReply'); rp.classList.add('hide'); rp.innerHTML = '';
+    $('#doneTitle').textContent = '已通知车主';
+    $('#doneMsg').classList.remove('hide');
+    $('#doneMsg').textContent = '请稍等片刻，车主收到后一般会尽快处理。';
+    const ack = $('#ackState');
+    ack.className = 'pill warn'; ack.innerHTML = '<span class="dot"></span><span>等待车主处理</span>';
+    $('#doneArea').classList.add('hide'); $('#formArea').classList.remove('hide');
+  }).catch(e=>toast(e.message));
+};
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  ".url": {
+    "movecarlite.Application": {
+      "noDisplay": false,
+      "allUsers": true,
+      "fileTypes": [],
+      "control": {
+        "accessPerm": "editable"
+      },
+      "protocol": "http",
+      "gatewaySocket": "app.sock",
+      "gatewayPrefix": "/app/movecarlite",
+      "title": "挪车助手",
+      "icon": "images/icon_{0}.png",
+      "type": "iframe",
+      "url": "/app/movecarlite/admin"
+    }
+  }
+}

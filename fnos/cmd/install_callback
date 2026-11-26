@@ -1,0 +1,30 @@
+#!/bin/bash
+# 安装后：建数据目录、落盘管理密码、启动服务
+set -u
+
+# 优先用已安装目录里的 main；安装流程里 $0 可能指向临时解包目录
+CMD_DIR="/var/apps/movecarlite/cmd"
+[ -x "${CMD_DIR}/main" ] || CMD_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+
+PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/movecarlite}"
+PASS_FILE="${PKGVAR}/admin.password"
+
+mkdir -p "${PKGVAR}/data" || exit 1
+
+# 向导里的管理密码落盘（600），main 启动时读取
+if [ -n "${admin_password:-}" ]; then
+    printf '%s\n' "${admin_password}" > "${PASS_FILE}"
+    chmod 600 "${PASS_FILE}" 2>/dev/null
+fi
+
+# 脚本以 root 执行时把目录交给应用用户，否则应用无权写库
+if [ "$(id -u)" = "0" ] && [ -n "${TRIM_UID:-}" ]; then
+    chown -R "${TRIM_UID}:${TRIM_GID:-$TRIM_UID}" "${PKGVAR}" 2>/dev/null
+    chown -R "${TRIM_UID}:${TRIM_GID:-$TRIM_UID}" "${TRIM_PKGETC:-/vol1/@appconf/movecarlite}" 2>/dev/null
+fi
+
+# 记录本次安装的端口，便于排查
+echo "port=${ui_port:-18100}" > "${PKGVAR}/install.info" 2>/dev/null
+
+bash "${CMD_DIR}/main" start
+exit 0

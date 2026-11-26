@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>挪车系统 · 管理后台</title>
+<link rel="stylesheet" href="static/app.css?v=4">
+<style>
+  /* ── 后台专用（只影响本页） ───────────────────────────── */
+  body{background:#f5f6f8}
+
+  /* 登录 */
+  .login-wrap{min-height:100vh;display:grid;place-items:center;padding:26px;
+    background:radial-gradient(1100px 520px at 50% -12%,#e6eeff 0%,rgba(230,238,255,0) 62%),#f5f6f8}
+  .login-card{width:100%;max-width:384px;background:#fff;border:1px solid var(--line);border-radius:22px;
+    padding:30px 26px 26px;box-shadow:0 30px 70px -46px rgba(16,24,40,.65)}
+  .login-card .mark{margin:0 auto 14px}
+  .login-card h1{font-size:20px;text-align:center;margin:0 0 4px}
+  .login-card .sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px}
+  .login-foot{text-align:center;font-size:11.5px;color:#9aa3b2;margin-top:16px;line-height:1.5}
+
+  .mark{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;color:#fff;
+    background:linear-gradient(145deg,#3a83ff,#1550c8);box-shadow:0 10px 22px -12px rgba(31,111,235,.9)}
+  .mark svg{width:21px;height:21px}
+  .mark.lg{width:52px;height:52px;border-radius:15px}
+  .mark.lg svg{width:28px;height:28px}
+
+  /* 骨架 */
+  .adm{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+  .side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:2px;
+    padding:20px 14px 16px;background:#fff;border-right:1px solid var(--line);z-index:20}
+  .brand{display:flex;align-items:center;gap:11px;padding:0 8px 18px}
+  .brand .t1{font-size:14.5px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+  .brand .t2{font-size:11.5px;color:var(--muted);margin-top:1px}
+
+  .nav{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+  .nav button{all:unset;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:11px;
+    font-size:13.5px;font-weight:600;color:#414a58;cursor:pointer;transition:background .15s,color .15s}
+  .nav button:hover{background:#f3f4f7}
+  .nav button.on{background:#eaf1ff;color:#12509f}
+  .nav button svg{width:17px;height:17px;flex:none;opacity:.75}
+  .nav button.on svg{opacity:1}
+  .side-foot{margin-top:auto;padding:14px 8px 0;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);word-break:break-all;line-height:1.5}
+
+  .main{min-width:0;padding:24px 28px 64px;max-width:1180px}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+  .top h1{font-size:21px;margin:0 0 3px}
+  .top .sub{font-size:12.5px;color:var(--muted)}
+  .top-actions{display:flex;gap:8px;align-items:center;flex:none}
+  .chipd{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--line);
+    background:#fff;border-radius:10px;font-size:12px;color:#4b5563;max-width:300px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chipd svg{width:13px;height:13px;flex:none;opacity:.55}
+
+  /* 面板 */
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;
+    box-shadow:0 1px 2px rgba(16,24,40,.03)}
+  .panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .panel-h h3{margin:0;font-size:14.5px}
+  .panel-h .desc{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* 概览卡 */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+  .stat{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);
+    border-radius:16px;padding:15px 16px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+  .stat .ico{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none}
+  .stat .ico svg{width:20px;height:20px}
+  .ico.blue{background:#eaf1ff;color:#1a5cbf}
+  .ico.amber{background:#fdf3e3;color:#a1620a}
+  .ico.green{background:#e7f6ee;color:#0f7a44}
+  .stat .n{font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+  .stat .l{font-size:12px;color:var(--muted)}
+
+  /* 动态列表 */
+  .feed .it{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .feed .it:first-child{padding-top:0}
+  .feed .it:last-child{border-bottom:none;padding-bottom:0}
+  .fi-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background:#cbd1da}
+  .fi-dot.warn{background:var(--warn)}
+  .fi-dot.ok{background:var(--ok)}
+  .feed .body{flex:1;min-width:0}
+  .feed .t{font-size:13.5px;font-weight:650}
+  .feed .m{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .feed .r{font-size:11.5px;color:#9aa3b2;flex:none;text-align:right;line-height:1.5;
+    display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+
+  /* 车主卡片 */
+  .owners{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:13px}
+  .owner{background:#fff;border:1px solid var(--line);border-radius:15px;padding:15px;
+    transition:box-shadow .18s,border-color .18s}
+  .owner:hover{box-shadow:0 12px 28px -20px rgba(16,24,40,.55);border-color:#d8dde5}
+  .owner .head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .plate-b{display:inline-block;background:#15181d;color:#fff;border-radius:9px;padding:5px 11px;
+    font-size:16.5px;font-weight:800;letter-spacing:.03em}
+  .owner .meta{margin-top:9px;font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 10px}
+  .owner .meta b{color:#3d4553;font-weight:600}
+  .chz{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chz .t{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:7px;font-size:11.5px;font-weight:600}
+  .t.wxpusher{background:#eaf1ff;color:#14508f}
+  .t.email{background:#fdf3e3;color:#8a5b00}
+  .t.webhook{background:#f1ecff;color:#5b3fa8}
+  .t.wecom{background:#e6f6ec;color:#1a7f45}
+  .t.dingtalk{background:#e8f1fe;color:#1668d6}
+  .t.none{background:#f1f3f6;color:#6b7280}
+  .owner .acts{display:flex;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)}
+
+  /* 表格 */
+  .tblwrap{overflow:auto;margin:0 -4px}
+  .tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  .tbl th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8b93a1;font-weight:700;
+    text-align:left;padding:0 10px 9px;white-space:nowrap;border-bottom:1px solid var(--line)}
+  .tbl td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .tbl tbody tr:last-child td{border-bottom:none}
+  .tbl tbody tr:hover td{background:#fafbfc}
+  .tbl .id{font-variant-numeric:tabular-nums;color:#9aa3b2;font-size:12px}
+
+  /* 快捷入口 */
+  .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .quick a{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);
+    border-radius:12px;text-decoration:none;color:inherit;transition:background .15s,border-color .15s}
+  .quick a:hover{background:#fafbfc;border-color:#d8dde5}
+  .quick a:first-child{background:#f7faff;border-color:#dbe6fb}
+  .quick .qi{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;background:#eef2f8;color:#4b5563}
+  .quick a:first-child .qi{background:#e3ecff;color:#1657b8}
+  .quick .qi svg{width:16px;height:16px}
+  .quick b{display:block;font-size:13px;font-weight:650}
+  .quick span{display:block;font-size:11.5px;color:var(--muted)}
+
+  /* 空状态 */
+  .empty{text-align:center;padding:26px 10px;color:var(--muted);font-size:13px}
+  .empty svg{width:30px;height:30px;opacity:.35;margin-bottom:8px}
+
+  /* 弹层 */
+  .modal{position:fixed;inset:0;background:rgba(12,16,22,.45);display:flex;align-items:flex-end;
+    justify-content:center;z-index:80;backdrop-filter:blur(2px)}
+  .sheet{background:#fff;width:100%;max-width:580px;max-height:92vh;display:flex;flex-direction:column;
+    border-radius:22px 22px 0 0;overflow:hidden}
+  .sheet-h{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:18px 20px 12px;border-bottom:1px solid var(--line)}
+  .sheet-h h2{margin:0;font-size:17px}
+  .sheet-body{flex:1;min-height:0;overflow:auto;padding:16px 20px 8px;overscroll-behavior:contain}
+  .sheet-f{flex:none;display:flex;gap:10px;padding:13px 20px 18px;border-top:1px solid var(--line);background:#fff}
+  @media(min-width:640px){ .modal{align-items:center} .sheet{border-radius:20px;max-height:88vh} }
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  .sec{font-size:12.5px;font-weight:700;color:#3d4553;margin:18px 0 9px;display:flex;align-items:center;gap:7px}
+  .sec::before{content:'';width:3px;height:12px;border-radius:2px;background:#cfd6e2}
+
+  .linkbox{display:flex;gap:8px;align-items:center;background:#f7f8fa;border:1px solid #eef0f3;
+    border-radius:10px;padding:8px 10px;font-size:12.5px;color:var(--muted);overflow:hidden;margin-bottom:8px}
+  .linkbox code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#374151;flex:1;
+    cursor:text;-webkit-user-select:all;user-select:all}
+  .linkbox .sm.ok{color:#15803d;border-color:#bbf7d0;background:#f0fdf4}
+  .ch{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fbfbfc}
+
+  @media (max-width:900px){
+    .adm{grid-template-columns:minmax(0,1fr)}
+    .side{position:sticky;top:0;height:auto;flex-direction:row;align-items:center;gap:10px;
+      padding:9px 12px;border-right:none;border-bottom:1px solid var(--line);overflow:auto}
+    .brand{padding:0;flex:none}
+    .brand .t1{display:none}
+    .nav{flex-direction:row;gap:2px;margin:0}
+    .nav button{padding:8px 12px;font-size:13px}
+    .nav button svg{display:none}
+    .side-foot{display:none}
+    .main{padding:16px 14px 72px}
+    .top{margin-bottom:14px}
+    .top h1{font-size:19px}
+    .chipd{display:none}
+    .stats{grid-template-columns:1fr;gap:10px}
+    .stat{padding:13px 14px}
+    .owners{grid-template-columns:1fr}
+    .grid2{grid-template-columns:1fr}
+  }
+  @media (max-width:640px){
+    .top{flex-wrap:wrap;gap:10px}
+    .top>div:first-child{flex:1 1 auto;min-width:0}
+    .top-actions{flex:none;margin-left:auto}
+    .top-actions .sm{padding:7px 10px;font-size:12.5px}
+    .stats{grid-template-columns:repeat(3,1fr);gap:9px}
+    .quick{grid-template-columns:1fr}
+    .stat{flex-direction:column;align-items:flex-start;gap:7px;padding:12px}
+    .stat .ico{width:32px;height:32px;border-radius:10px}
+    .stat .ico svg{width:16px;height:16px}
+    .stat .n{font-size:20px}
+    .stat .l{font-size:11.5px}
+    .side-gap{padding-left:2px}
+    .owner .acts .sm{padding:10px 12px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 登录 -->
+<div id="login" class="login-wrap hide">
+  <div class="login-card">
+    <div class="mark lg">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 17h14"/><path d="M6.8 17v-5.4c0-.5.3-1 .8-1.2l3.5-1.5a2 2 0 0 1 1.6 0l3.5 1.5c.5.2.8.7.8 1.2V17"/>
+        <circle cx="8.6" cy="17.6" r="1.5"/><circle cx="15.4" cy="17.6" r="1.5"/>
+      </svg>
+    </div>
+    <h1>挪车系统</h1>
+    <div class="sub">扫二维码通知车主，不用打电话</div>
+    <label class="field"><span>管理密码</span>
+      <input id="pwd" type="password" autocomplete="current-password" placeholder="请输入管理密码"></label>
+    <button class="block big" id="loginBtn" style="margin-top:6px">登录</button>
+    <div class="login-foot">端口和密码请在应用设置里修改</div>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div id="main" class="adm hide">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 17h14"/><path d="M6.8 17v-5.4c0-.5.3-1 .8-1.2l3.5-1.5a2 2 0 0 1 1.6 0l3.5 1.5c.5.2.8.7.8 1.2V17"/>
+          <circle cx="8.6" cy="17.6" r="1.5"/><circle cx="15.4" cy="17.6" r="1.5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="t1">挪车系统</div>
+        <div class="t2">管理后台</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="tabs">
+      <button data-t="overview" class="on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+        概览
+      </button>
+      <button data-t="owners">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        车主
+      </button>
+      <button data-t="calls">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        记录
+      </button>
+      <button data-t="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        设置
+      </button>
+    </nav>
+
+    <div class="side-foot">扫码入口<br><span id="domainLine"></span></div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1 id="pageTitle">概览</h1>
+        <div class="sub" id="pageSub">所有车主与呼叫情况一览</div>
+      </div>
+      <div class="top-actions">
+        <span class="chipd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg>
+          <span id="domainChip"></span>
+        </span>
+        <button class="sm hide" id="addOwner">+ 新增车主</button>
+        <button class="ghost sm" id="refresh">刷新</button>
+        <button class="ghost sm" id="logout">退出</button>
+      </div>
+    </div>
+
+    <!-- 概览 -->
+    <section id="tab-overview">
+      <div class="stats">
+        <div class="stat">
+          <div class="ico blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          </div>
+          <div><div class="n" id="sOwners">0</div><div class="l">车主</div></div>
+        </div>
+        <div class="stat">
+          <div class="ico amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          </div>
+          <div><div class="n" id="sToday">0</div><div class="l">今日呼叫</div></div>
+        </div>
+        <div class="stat">
+          <div class="ico green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+          <div><div class="n" id="sPending">0</div><div class="l">待处理</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <div><h3>最近呼叫</h3><div class="desc">最新的 6 条记录</div></div>
+          <button class="ghost sm" data-goto="calls">查看全部</button>
+        </div>
+        <div class="feed" id="recent"></div>
+      </div>
+
+      <div class="panel" id="quickPanel">
+        <div class="panel-h">
+          <div><h3>快捷入口</h3><div class="desc">拿第一个车主演示这套页面</div></div>
+        </div>
+        <div class="quick" id="quick"></div>
+      </div>
+    </section>
+
+    <!-- 车主 -->
+    <section id="tab-owners" class="hide">
+      <div class="owners" id="ownerList"></div>
+    </section>
+
+    <!-- 记录 -->
+    <section id="tab-calls" class="hide">
+      <div class="panel">
+        <div class="panel-h">
+          <div><h3>呼叫记录</h3><div class="desc">近 50 条</div></div>
+        </div>
+        <div class="tblwrap"><table class="tbl" id="callTable"></table></div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section id="tab-settings" class="hide">
+      <div class="panel">
+        <div class="panel-h"><div><h3>基础设置</h3><div class="desc">域名决定二维码与推送里的链接</div></div></div>
+        <label class="field"><span>外网主域名（https:// 开头，末尾不带斜杠；留空则用当前访问地址）</span>
+          <input id="site_domain" placeholder="https://car.example.com"></label>
+        <div class="grid2">
+          <label class="field"><span>未授权定位的罚站秒数</span><input id="cooldown" type="number" min="0" max="300"></label>
+          <label class="field"><span>同一人最短呼叫间隔（秒）</span><input id="ratelimit" type="number" min="0" max="3600"></label>
+        </div>
+        <label class="field"><span>默认 WxPusher appToken（车主未单独填时使用）</span>
+          <input id="default_wxpusher_token" class="mono" placeholder="AT_xxxx"></label>
+        <button id="saveSettings">保存设置</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><div><h3>邮件发件服务器</h3><div class="desc">走 SMTP 推送的车主需要填这里</div></div></div>
+        <div class="grid2">
+          <label class="field"><span>服务器</span><input id="smtp_host" placeholder="smtp.qq.com"></label>
+          <label class="field"><span>端口</span><input id="smtp_port" placeholder="587 / 465"></label>
+          <label class="field"><span>账号</span><input id="smtp_user" placeholder="you@qq.com"></label>
+          <label class="field"><span>授权码 / 密码</span><input id="smtp_pass" type="password" placeholder="留空表示不修改"></label>
+        </div>
+        <label class="field"><span>发件人（格式必须为：名称 &lt;邮箱&gt;）</span>
+          <input id="smtp_from" placeholder="挪车小助手 <you@qq.com>"></label>
+        <p class="muted tiny">QQ 邮箱：设置 → 账号 → 开启 POP3/SMTP → 生成 16 位授权码；465 走 SSL，587 走 STARTTLS。</p>
+        <button id="saveSmtp">保存 SMTP</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><div><h3>修改管理密码</h3><div class="desc">改完立即生效</div></div></div>
+        <div class="row"><input id="newPwd" type="password" placeholder="新密码，至少 6 位"><button class="sm" id="savePwd">修改</button></div>
+        <p class="muted tiny" style="margin-top:10px">请记牢新密码；忘记后可在应用数据中心重置。</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 车主编辑弹层 -->
+<div class="modal hide" id="modal">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h2 id="mTitle">新增车主</h2>
+      <button class="ghost sm" id="mClose">关闭</button>
+    </div>
+
+    <div class="sheet-body">
+    <div class="sec">车辆信息</div>
+    <div class="grid2">
+      <label class="field"><span>唯一标识（链接用）</span><input id="f_code" placeholder="mycar"></label>
+      <label class="field"><span>车牌号（海报大字）</span><input id="f_plate" placeholder="鲁B·12345"></label>
+    </div>
+    <div class="grid2">
+      <label class="field"><span>称呼</span><input id="f_name" placeholder="王先生"></label>
+      <label class="field"><span>联系电话（呼叫成功后展示给扫码人）</span><input id="f_phone" placeholder="13800000000"></label>
+    </div>
+    <label class="field"><span>收件邮箱（邮件通道用）</span><input id="f_email" placeholder="me@qq.com"></label>
+    <label class="field"><span>备注（会显示在扫码页）</span><input id="f_note" placeholder="白色 SUV，常停 3 号楼东侧"></label>
+    <label class="field"><span>启用</span>
+      <select id="f_enabled"><option value="1">启用</option><option value="0">停用</option></select></label>
+
+    <div class="row between" style="margin:18px 0 9px">
+      <div class="sec" style="margin:0">推送通道</div>
+      <button class="sm soft" id="addCh">+ 添加通道</button>
+    </div>
+    <div id="chList"></div>
+
+    <div id="links" class="hide" style="margin-top:6px">
+      <div class="sec">链接与测试</div>
+      <div class="linkbox"><code id="lCall"></code><button class="sm ghost" data-copy="lCall">复制</button></div>
+      <div class="linkbox"><code id="lOwner"></code><button class="sm ghost" data-copy="lOwner">复制</button></div>
+      <div class="linkbox"><code id="lPoster"></code><button class="sm ghost" data-copy="lPoster">复制</button></div>
+      <div class="row" style="margin-top:10px">
+        <a class="btn sm ghost" id="lOpenPoster" target="_blank">打开海报页</a>
+        <button class="sm ghost" id="testPush">发测试通知</button>
+      </div>
+    </div>
+    </div>
+
+    <div class="sheet-f">
+      <button class="grow" id="mSave">保存</button>
+      <button class="danger hide" id="mDel">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = { token: localStorage.getItem('mc_token') || '', state: null, editing: null, domain: location.origin };
+
+function toast(m, ms=2600){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'), ms); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function p2(n){ return String(n).padStart(2,'0'); }
+function fmt(ts){ if(!ts) return '—'; const d=new Date(ts*1000); const t=new Date(); const hm=p2(d.getHours())+':'+p2(d.getMinutes());
+  if(d.toDateString()===t.toDateString()) return '今天 '+hm; return `${d.getMonth()+1}/${d.getDate()} ${hm}`; }
+
+async function api(path, body, method){
+  const r = await fetch(path, {
+    method: method || (body===undefined?'GET':'POST'),
+    headers: Object.assign({'Content-Type':'application/json'}, store.token?{'Authorization':'Bearer '+store.token}:{}),
+    body: body===undefined?undefined:JSON.stringify(body)
+  });
+  const j = await r.json().catch(()=>({ok:false,error:'HTTP '+r.status}));
+  if(r.status===401){ showLogin(); throw new Error('登录已过期'); }
+  if(!r.ok || j.ok===false) throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+
+function showLogin(){ $('#login').classList.remove('hide'); $('#main').classList.add('hide'); document.body.style.background='#f5f6f8'; $('#pwd').focus(); }
+function showMain(){ $('#login').classList.add('hide'); $('#main').classList.remove('hide'); }
+
+$('#loginBtn').onclick = async () => {
+  const pwd = $('#pwd').value.trim();
+  if(!pwd) return toast('请输入密码');
+  const btn = $('#loginBtn'); btn.disabled=true; btn.textContent='登录中…';
+  try{
+    const r = await api('api/admin/login', {password:pwd});
+    store.token = r.token; localStorage.setItem('mc_token', r.token);
+    await load(); showMain(); goTab(location.hash.slice(1) || 'overview', true);
+  }catch(e){ toast(e.message); }
+  finally{ btn.disabled=false; btn.textContent='登录'; }
+};
+$('#pwd').onkeydown = e => { if(e.key==='Enter') $('#loginBtn').click(); };
+$('#logout').onclick = async () => { try{ await api('api/admin/logout', {}); }catch(e){} localStorage.removeItem('mc_token'); store.token=''; showLogin(); };
+$('#refresh').onclick = async () => { try{ await load(); toast('已刷新'); }catch(e){ toast(e.message); } };
+
+// ---- 加载
+async function load(){
+  const st = await api('api/admin/state');
+  store.state = st; store.domain = (st.settings.site_domain||'').replace(/\/$/,'') || location.origin;
+  $('#domainLine').textContent = store.domain;
+  $('#domainChip').textContent = store.domain.replace(/^https?:\/\//,'');
+  renderStats(); renderOwners(); renderCalls(); renderQuick(); fillSettings();
+}
+
+function renderQuick(){
+  const list = store.state.owners || [];
+  const ow = list.find(o=>o.enabled) || list[0];
+  const panel = $('#quickPanel');
+  if(!ow){ panel.classList.add('hide'); return; }
+  panel.classList.remove('hide');
+  const c = encodeURIComponent(ow.code);
+  $('#quick').innerHTML = `
+    <a href="?u=${c}" target="_blank">
+      <span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/></svg></span>
+      <span><b>扫码呼叫页</b><span>${esc(ow.plate||ow.code)}</span></span>
+    </a>
+    <a href="owner-confirm?u=${c}" target="_blank">
+      <span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span>
+      <span><b>车主接单页</b><span>点开就能收通知</span></span>
+    </a>
+    <a href="qr?u=${c}" target="_blank">
+      <span class="qi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
+      <span><b>挪车海报</b><span>三款样式可下载</span></span>
+    </a>`;
+}
+
+function renderStats(){
+  const st = store.state;
+  $('#sOwners').textContent = st.stats.owners;
+  $('#sToday').textContent = st.stats.calls_today;
+  $('#sPending').textContent = st.calls.filter(c=>!c.acked_at).length;
+
+  const status = c => c.acked_at
+    ? '<span class="pill ok"><span class="dot"></span>已确认</span>'
+    : ((c.push||'').includes('FAIL')
+        ? '<span class="pill err"><span class="dot"></span>推送失败</span>'
+        : '<span class="pill warn"><span class="dot"></span>待处理</span>');
+
+  $('#recent').innerHTML = st.calls.length ? st.calls.slice(0,6).map(c=>`
+    <div class="it">
+      <span class="fi-dot ${c.acked_at?'ok':((c.push||'').includes('FAIL')?'':'warn')}"></span>
+      <div class="body">
+        <div class="t">${esc(c.reason||'请求挪车')} <span class="tag">${esc(c.code)}</span></div>
+        ${c.note?`<div class="m">${esc(c.note)}</div>`:(c.lat!=null?'<div class="m">附带了位置</div>':'<div class="m">未附位置</div>')}
+      </div>
+      <div class="r">${fmt(c.created_at)}${status(c)}</div>
+    </div>`).join('')
+    : `<div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <div>还没有人扫码呼叫</div>
+      </div>`;
+}
+
+const CH_LABEL = {wxpusher:'WxPusher', email:'邮件', wecom:'企业微信', dingtalk:'钉钉', webhook:'Webhook'};
+
+function renderOwners(){
+  const list = store.state.owners;
+  $('#ownerList').innerHTML = list.length ? list.map(o=>`
+    <article class="owner">
+      <div class="head">
+        <span class="plate-b plate">${esc(o.plate||o.code)}</span>
+        ${o.enabled
+          ? '<span class="pill ok"><span class="dot"></span>启用</span>'
+          : '<span class="pill"><span class="dot"></span>停用</span>'}
+      </div>
+      <div class="meta">
+        <span>标识 <b>${esc(o.code)}</b></span>
+        ${o.name?`<span>${esc(o.name)}</span>`:''}
+        ${o.phone?`<span>${esc(o.phone)}</span>`:''}
+      </div>
+      ${o.note?`<div class="meta"><span>${esc(o.note)}</span></div>`:''}
+      <div class="chz">
+        ${(o.channels||[]).map(c=>`<span class="t ${esc(c.type)}">${esc(CH_LABEL[c.type]||c.type)}</span>`).join('')
+          || '<span class="t none">未配置通道</span>'}
+      </div>
+      <div class="acts">
+        <button class="sm ghost grow" data-qr="${esc(o.code)}">二维码</button>
+        <button class="sm soft grow" data-edit="${o.id}">编辑</button>
+      </div>
+    </article>`).join('')
+    : `<div class="panel empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        <div>还没有车主，点右上角「新增车主」</div>
+      </div>`;
+  document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEditor(+b.dataset.edit));
+  document.querySelectorAll('[data-qr]').forEach(b => b.onclick = () => window.open('api/qr/'+encodeURIComponent(b.dataset.qr)+'.png','_blank'));
+}
+
+function renderCalls(){
+  const rows = store.state.calls.map(c=>`
+    <tr>
+      <td class="id">${c.id}</td>
+      <td><b>${esc(c.code)}</b></td>
+      <td>${esc(c.reason||'')}${c.note?'<div class="muted tiny">'+esc(c.note)+'</div>':''}</td>
+      <td class="muted tiny">${c.lat!=null?c.lat.toFixed(5)+', '+c.lng.toFixed(5):'无定位'}</td>
+      <td class="muted tiny">${fmt(c.created_at)}</td>
+      <td>${c.acked_at
+        ? '<span class="pill ok"><span class="dot"></span>已确认</span>'
+        : ((c.push||'').includes('FAIL')
+            ? '<span class="pill err"><span class="dot"></span>推送失败</span>'
+            : '<span class="pill warn"><span class="dot"></span>待处理</span>')}</td>
+    </tr>`).join('');
+  $('#callTable').innerHTML = `<thead><tr><th>#</th><th>车主</th><th>原因 / 留言</th><th>位置</th><th>时间</th><th>状态</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6" class="muted">暂无记录</td></tr>'}</tbody>`;
+}
+
+function fillSettings(){
+  const s = store.state.settings;
+  ['site_domain','cooldown','ratelimit','smtp_host','smtp_port','smtp_user','smtp_from','default_wxpusher_token'].forEach(k=>{ const el=$('#'+k); if(el) el.value = s[k]||''; });
+  $('#smtp_pass').value = '';
+}
+
+$('#saveSettings').onclick = async () => {
+  const patch = {};
+  ['site_domain','cooldown','ratelimit','default_wxpusher_token'].forEach(k=> patch[k] = $('#'+k).value.trim());
+  try{ await api('api/admin/settings', {settings:patch}); toast('已保存'); await load(); }catch(e){ toast(e.message); }
+};
+$('#saveSmtp').onclick = async () => {
+  const patch = {smtp_host:$('#smtp_host').value.trim(), smtp_port:$('#smtp_port').value.trim(),
+    smtp_user:$('#smtp_user').value.trim(), smtp_from:$('#smtp_from').value.trim()};
+  const pwd = $('#smtp_pass').value;
+  if(pwd) patch.smtp_pass = pwd;
+  try{ await api('api/admin/settings', {settings:patch}); toast('SMTP 已保存'); await load(); }catch(e){ toast(e.message); }
+};
+$('#savePwd').onclick = async () => {
+  try{ const r = await api('api/admin/password', {password:$('#newPwd').value.trim()}); toast(r.note||'已修改', 4000); $('#newPwd').value=''; }catch(e){ toast(e.message); }
+};
+
+// ---- 导航
+const TAB_META = {
+  overview: ['概览','所有车主与呼叫情况一览'],
+  owners:   ['车主','每位车主一个二维码，可配多个推送通道'],
+  calls:    ['记录','谁在什么时候呼叫了哪位车主'],
+  settings: ['设置','域名、罚站、通道与密码']
+};
+function goTab(t, silent){
+  if(!TAB_META[t]) t = 'overview';
+  [...$('#tabs').children].forEach(x=>x.classList.toggle('on', x.dataset.t===t));
+  ['overview','owners','calls','settings'].forEach(k=> $('#tab-'+k).classList.toggle('hide', k!==t));
+  const m = TAB_META[t];
+  $('#pageTitle').textContent = m[0]; $('#pageSub').textContent = m[1];
+  $('#addOwner').classList.toggle('hide', t!=='owners');
+  if(!silent) history.replaceState(null, '', location.pathname + location.search + '#' + t);
+  if(!silent) window.scrollTo({top:0,behavior:'smooth'});
+}
+$('#tabs').onclick = e => {
+  const b = e.target.closest('button[data-t]'); if(!b) return;
+  goTab(b.dataset.t);
+};
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-goto]'); if(g) goTab(g.dataset.goto);
+});
+
+// ---- 通道编辑
+const CH_DEF = {
+  wxpusher: [{k:'app_token', label:'appToken（可留空用默认）'}, {k:'target', label:'UID_xxx 或 topicId（数字）'}],
+  email: [{k:'to', label:'收件邮箱（留空用车主邮箱）'}],
+  wecom: [{k:'url', label:'企业微信群机器人地址（…/cgi-bin/webhook/send?key=…）'},
+          {k:'format', label:'消息格式：留空=图文卡片（微信里能看能点），或填 text'}],
+  dingtalk: [{k:'url', label:'钉钉群机器人地址（…/robot/send?access_token=…）'}],
+  webhook: [{k:'url', label:'自定义 Webhook 地址（POST 我们自己的 JSON）'}]
+};
+const CH_TYPES = ['wxpusher','email','wecom','dingtalk','webhook'];
+const CH_NAMES = {wxpusher:'WxPusher', email:'邮件', wecom:'企业微信', dingtalk:'钉钉', webhook:'Webhook'};
+function chRow(ch){
+  const type = ch.type || 'wxpusher';
+  const fields = CH_DEF[type] || [];
+  const el = document.createElement('div');
+  el.className = 'ch';
+  el.innerHTML = `
+    <div class="row">
+      <select class="ch-type" style="max-width:170px">
+        ${CH_TYPES.map(t=>`<option value="${t}" ${t===type?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <span class="grow"></span>
+      <button class="sm danger ch-del">移除</button>
+    </div>
+    ${fields.map(f=>`<div class="row" style="margin-top:8px">
+        <input class="ch-f" data-k="${f.k}" placeholder="${f.label}" value="${esc(ch[f.k]||'')}">
+      </div>`).join('')}`;
+  el.querySelector('.ch-type').onchange = ev => {
+    const data = collectCh(el); data.type = ev.target.value;
+    el.replaceWith(chRow(data));
+  };
+  el.querySelector('.ch-del').onclick = () => el.remove();
+  return el;
+}
+function collectCh(el){
+  const o = {type: el.querySelector('.ch-type').value};
+  el.querySelectorAll('.ch-f').forEach(i=>{ if(i.value.trim()) o[i.dataset.k] = i.value.trim(); });
+  return o;
+}
+
+// ---- 车主编辑
+function openEditor(id){
+  store.editing = id || null;
+  const o = id ? store.state.owners.find(x=>x.id===id) : {code:'',plate:'',name:'',note:'',email:'',phone:'',enabled:1,channels:[]};
+  $('#mTitle').textContent = id ? '编辑车主' : '新增车主';
+  $('#f_code').value = o.code||''; $('#f_plate').value = o.plate||'';
+  $('#f_name').value = o.name||''; $('#f_note').value = o.note||'';
+  $('#f_phone').value = o.phone||'';
+  $('#f_email').value = o.email||''; $('#f_enabled').value = String(o.enabled?1:0);
+  const cl = $('#chList'); cl.innerHTML = '';
+  (o.channels&&o.channels.length ? o.channels : [{type:'wxpusher', target:''}]).forEach(c=> cl.appendChild(chRow(c)));
+  const links = $('#links');
+  if(id && o.code){
+    links.classList.remove('hide');
+    const d = store.domain;
+    $('#lCall').textContent = `${d}/?u=${o.code}`;
+    $('#lOwner').textContent = `${d}/owner-confirm?u=${o.code}`;
+    $('#lPoster').textContent = `${d}/qr?u=${o.code}`;
+    $('#lOpenPoster').href = `/qr?u=${encodeURIComponent(o.code)}`;
+    $('#mDel').classList.remove('hide');
+  } else {
+    links.classList.add('hide'); $('#mDel').classList.add('hide');
+  }
+  $('#modal').classList.remove('hide');
+}
+$('#addOwner').onclick = () => openEditor(null);
+$('#mClose').onclick = () => $('#modal').classList.add('hide');
+$('#addCh').onclick = () => $('#chList').appendChild(chRow({type:'webhook', url:''}));
+
+$('#mSave').onclick = async () => {
+  const channels = [...$('#chList').children].map(collectCh).filter(c=>Object.keys(c).length>1);
+  const body = {
+    id: store.editing, code: $('#f_code').value.trim(), plate: $('#f_plate').value.trim(),
+    name: $('#f_name').value.trim(), note: $('#f_note').value.trim(), email: $('#f_email').value.trim(),
+    phone: $('#f_phone').value.trim(),
+    enabled: $('#f_enabled').value === '1', channels
+  };
+  try{ await api('api/admin/owner', body); toast('已保存'); $('#modal').classList.add('hide'); await load(); }
+  catch(e){ toast(e.message); }
+};
+$('#mDel').onclick = async () => {
+  if(!store.editing || !confirm('删除该车主及其全部呼叫记录？')) return;
+  try{ await api('api/admin/owner/delete', {id: store.editing}); toast('已删除'); $('#modal').classList.add('hide'); await load(); }
+  catch(e){ toast(e.message); }
+};
+$('#testPush').onclick = async () => {
+  if(!store.editing) return toast('先保存车主再测试');
+  $('#testPush').disabled = true;
+  try{
+    const r = await api('api/admin/owner/test', {id: store.editing});
+    toast(r.channels.map(c=>`${c.type}: ${c.ok?'成功':'失败 - '+c.info}`).join(' | '), 6000);
+  }catch(e){ toast(e.message); }
+  finally{ $('#testPush').disabled = false; }
+};
+// 复制文本：HTTP 源下没有 navigator.clipboard，必须逐级降级
+async function copyText(txt){
+  if(!txt) return false;
+  if(window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText){
+    try{ await navigator.clipboard.writeText(txt); return true; }catch(e){}
+  }
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.setAttribute('readonly','');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if(ok) return true;
+  }catch(e){}
+  return false;
+}
+function selectNode(el){
+  try{
+    const r = document.createRange(); r.selectNodeContents(el);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }catch(e){}
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]'); if(!b) return;
+  const el = $('#' + b.dataset.copy); if(!el) return;
+  const txt = el.textContent.trim();
+  const old = b.textContent;
+  const ok = await copyText(txt);
+  if(ok){
+    b.textContent = '已复制'; b.classList.add('ok');
+    setTimeout(()=>{ b.textContent = old; b.classList.remove('ok'); }, 1400);
+    toast('已复制到剪贴板');
+  }else{
+    selectNode(el);
+    toast('当前为 HTTP 访问，浏览器禁止自动复制；已帮你选中，按 Ctrl+C / 长按复制', 6000);
+  }
+});
+
+// ---- 启动
+(async () => {
+  if(!store.token){ showLogin(); return; }
+  try{ await load(); showMain(); goTab(location.hash.slice(1) || 'overview', true); }catch(e){ showLogin(); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+appname                    = movecarlite
+version                    = 1.0.4
+display_name               = 挪车助手 Lite
+desc                       = <p>轻量级智能挪车通知系统：扫码呼叫车主、微信/邮件/Webhook 多渠道通知、车主一键确认。纯 Python 标准库 + SQLite 实现，无需 Node.js、无需 Redis，资源占用极低。</p><p>装完点桌面图标即进管理后台（走飞牛统一网关，反代/中继/域名访问都不会白屏）；端口与管理密码在安装向导里自定义，之后可在「应用设置」里修改。</p>
+platform                   = all
+source                     = thirdparty
+maintainer                 = movecar-lite
+maintainer_url             = https://github.com/nbbk/MoveCar-Docker-NB
+ctl_stop                   = true
+service_port               = 18100
+checkport                  = false
+desktop_uidir              = ui
+desktop_applaunchname      = movecarlite.Application
+disable_authorization_path = true
+os_min_version             = 1.1.3100
+changelog                  = 1.0.4 去掉代码里写死的默认管理密码（未设置时随机生成并打印），发布包不再含任何口令；1.0.3 登录页提示改为「端口和密码请在应用设置里修改」；1.0.2 桌面入口改走飞牛统一网关（/app/movecarlite），修复反代/域名访问点图标白屏

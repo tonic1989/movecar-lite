@@ -1,0 +1,36 @@
+[
+  {
+    "stepTitle": "确认卸载",
+    "items": [
+      {
+        "type": "tips",
+        "field": "wizard_tips_1",
+        "label": "卸载说明",
+        "rules": [],
+        "options": [],
+        "helpText": "即将卸载「挪车助手 Lite」。请选择如何处理车主数据与呼叫记录："
+      },
+      {
+        "type": "radio",
+        "field": "wizard_data_action",
+        "label": "数据处理方式",
+        "rules": [
+          { "required": true, "message": "请选择数据处理方式" }
+        ],
+        "options": [
+          { "label": "保留数据（推荐）- 以后重新安装可继续使用", "value": "keep" },
+          { "label": "删除所有数据 - 车主、呼叫记录、设置全部清除", "value": "delete" }
+        ],
+        "initValue": "keep"
+      },
+      {
+        "type": "tips",
+        "field": "wizard_tips_2",
+        "label": "提示",
+        "rules": [],
+        "options": [],
+        "helpText": "选择「保留数据」时，文件仍在 NAS 的 @appdata/movecarlite 目录；选择「删除」后无法恢复。"
+      }
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+#!/bin/bash
+# 卸载后：按卸载向导选择决定是否删除数据
+PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/movecarlite}"
+ACTION="${wizard_data_action:-keep}"
+
+if [ "$ACTION" = "delete" ]; then
+    echo "[uninstall] 删除数据目录 ${PKGVAR}"
+    rm -rf "${PKGVAR}" 2>/dev/null
+else
+    echo "[uninstall] 保留数据目录 ${PKGVAR}"
+fi
+exit 0

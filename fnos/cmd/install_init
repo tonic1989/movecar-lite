@@ -1,0 +1,6 @@
+#!/bin/bash
+# 安装前：仅做日志，无破坏性操作
+PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/movecarlite}"
+mkdir -p "${PKGVAR}" 2>/dev/null
+echo "[install_init] app=${TRIM_APPNAME} ver=${TRIM_APPVER} vol=${TRIM_APPDEST_VOL} port=${ui_port}" >> "${PKGVAR}/info.log" 2>/dev/null
+exit 0
